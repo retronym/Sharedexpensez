@@ -5,7 +5,7 @@ import Scalaz._
  * Original Haskell version:
  * http://lpenz.github.com/articles/hedsl-sharedexpenses/index.html
  */
-object sharedexpensez {
+object sharedexpensez extends Application {
   // Example
 
   val dexter = Person("Dexter")
@@ -25,22 +25,36 @@ object sharedexpensez {
   } yield x)
 
   println(solve(trip).mkString("\n"))
+  
+  val trip1 = sharedexpenses ( Seq (
+    dexter spent 5300
+    , angel  spent 2700
+    , debra  spent  800
+    , harry  spent 1900
+    , debra  spent 1700
+    , angel  spent 2200
+    , dexter gave  (harry, 2000)
+    , angel  gave  (debra, 3200)
+  ).sequence[({type λ[α]=State[Expenses, α]})#λ, Unit])
+
+  println(solve(trip1).mkString("\n"))
 
   // Implementation
+  type Expenses = Map[Person, Int]
 
   case class Person(name: String) {
     def spent(money: Int) = 
-      state { (s: Map[Person, Int]) => (adjust(this, money, s), ()) }
+      state { (s: Expenses) => (adjust(this, money, s), ()) }
 
     def gave(borrower: Person, money: Int) = 
-      state { (s: Map[Person, Int]) => (adjust(this, money, adjust(borrower, -money, s)), ()) }
+      state { (s: Expenses) => (adjust(this, money, adjust(borrower, -money, s)), ()) }
   }
 
-  def sharedexpenses(s: State[Map[Person, Int], Unit]) = 
+  def sharedexpenses(s: State[Expenses, _]) =
     s.apply(Map.empty)._1
 
-  def solve(state: Map[Person, Int]) = {
-    def solve1(err: Int, s: Map[Person, Int]): List[String] = {
+  def solve(state: Expenses) = {
+    def solve1(err: Int, s: Expenses): List[String] = {
       if (s.isEmpty) Nil
       else {
         val ordByMoney = Ordering[Int].on[(Person, Int)](_._2).reverse
@@ -57,6 +71,6 @@ object sharedexpensez {
     solve1(1 + state.size, state.mapValues(_ - avg))
   }
 
-  private def adjust(p: Person, amount: Int, m: Map[Person, Int]) =
+  private def adjust(p: Person, amount: Int, m: Expenses) =
     m.updated(p, m.getOrElse(p, 0) + amount)
 }
